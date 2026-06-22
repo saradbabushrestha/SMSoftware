@@ -5,11 +5,26 @@ educational institutions. Built as a single full-stack **Next.js** application
 with **PostgreSQL** + **Prisma**, role-based access control for 8 user types,
 JWT sessions with rotating refresh tokens, and a premium light/dark design system.
 
-> **Status — Foundation milestone complete.** Authentication, RBAC, the
-> multi-tenant data model, the design system and role-aware dashboards are built
-> and verified. The remaining ~30 product modules (attendance, exams, fees,
-> library, etc.) build on top of this foundation; each is reachable in the
-> sidebar and currently shows a "module in progress" page.
+> **Status.** Foundation complete (auth, RBAC, multi-tenant data model, design
+> system, role-aware dashboards) **plus the first real module — Students**
+> (full CRUD: list with search/filter/pagination, profile detail, create/edit
+> forms, soft-delete, status transitions, enrollment). The remaining modules
+> (attendance, exams, fees, library, …) build on this foundation; each is
+> reachable in the sidebar and currently shows a "module in progress" page.
+
+## Students module
+
+A complete vertical slice and the template for every future module:
+
+- **List** (`/dashboard/students`) — searchable, filterable (status, class),
+  paginated table with row actions, permission-gated "Add student".
+- **Profile** (`/dashboard/students/[id]`) — personal details, enrollment
+  history, linked guardians, inline status transitions.
+- **Create / Edit** (`/dashboard/students/new`, `…/[id]/edit`) — validated
+  (zod) forms; admission numbers auto-generate; class/section assignment creates
+  the enrollment for the active academic year.
+- **Delete** — soft-delete (archives the record, disables the account, preserves
+  history). Every mutation is permission-checked, audit-logged and revalidated.
 
 ## Tech stack
 
