@@ -6,25 +6,26 @@ with **PostgreSQL** + **Prisma**, role-based access control for 8 user types,
 JWT sessions with rotating refresh tokens, and a premium light/dark design system.
 
 > **Status.** Foundation complete (auth, RBAC, multi-tenant data model, design
-> system, role-aware dashboards) **plus the first real module — Students**
-> (full CRUD: list with search/filter/pagination, profile detail, create/edit
-> forms, soft-delete, status transitions, enrollment). The remaining modules
-> (attendance, exams, fees, library, …) build on this foundation; each is
-> reachable in the sidebar and currently shows a "module in progress" page.
+> system, role-aware dashboards) **plus two real modules — Students and
+> Teachers** (full CRUD). The remaining modules (attendance, exams, fees,
+> library, …) build on this foundation; each is reachable in the sidebar and
+> currently shows a "module in progress" page.
 
-## Students module
+## Built modules
 
-A complete vertical slice and the template for every future module:
+Each module is a full vertical slice (data layer → server actions → UI) and a
+template for the next. Every mutation is permission-checked, audit-logged and
+revalidated; lists are tenant-scoped, searchable, filterable and paginated.
 
-- **List** (`/dashboard/students`) — searchable, filterable (status, class),
-  paginated table with row actions, permission-gated "Add student".
-- **Profile** (`/dashboard/students/[id]`) — personal details, enrollment
-  history, linked guardians, inline status transitions.
-- **Create / Edit** (`/dashboard/students/new`, `…/[id]/edit`) — validated
-  (zod) forms; admission numbers auto-generate; class/section assignment creates
-  the enrollment for the active academic year.
-- **Delete** — soft-delete (archives the record, disables the account, preserves
-  history). Every mutation is permission-checked, audit-logged and revalidated.
+**Students** (`/dashboard/students`)
+- List with search + status/class filters; profile with enrollment history and
+  linked guardians; create/edit forms (auto admission numbers, class/section
+  enrollment for the active year); soft-delete; status transitions.
+
+**Teachers** (`/dashboard/teachers`)
+- List with search + status/subject filters; profile with subjects taught and
+  classes led; create/edit forms (auto employee IDs, subject assignment,
+  super-admin school picker); soft-delete; activate/suspend.
 
 ## Tech stack
 

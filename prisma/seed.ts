@@ -261,6 +261,23 @@ async function main() {
   }
   console.log(`  ✓ ${created} extra students + 5 extra teachers`);
 
+  // 9) Assign subjects to teachers for a realistic roster.
+  const allSubjects = await db.subject.findMany({ where: { schoolId: school.id }, orderBy: { code: "asc" } });
+  const byCode = (code: string) => allSubjects.find((s) => s.code === code)!;
+  const allTeachers = await db.teacher.findMany({ where: { schoolId: school.id, deletedAt: null }, orderBy: { employeeId: "asc" } });
+  for (let i = 0; i < allTeachers.length; i++) {
+    const t = allTeachers[i];
+    const subs =
+      t.employeeId === "EMP-0001"
+        ? [byCode("MATH"), byCode("SCI")] // headline demo teacher teaches Mathematics & Science
+        : [allSubjects[i % allSubjects.length]];
+    await db.teacher.update({
+      where: { id: t.id },
+      data: { subjects: { set: subs.map((s) => ({ id: s.id })) } },
+    });
+  }
+  console.log(`  ✓ subjects assigned to ${allTeachers.length} teachers`);
+
   console.log("✅ Seed complete.");
 }
 
