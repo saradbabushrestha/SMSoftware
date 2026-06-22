@@ -1,0 +1,32 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: sms_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: sms
+      POSTGRES_PASSWORD: sms_dev_password
+      POSTGRES_DB: school_management
+    ports:
+      # Host 5437 -> container 5432 (5432/5433/5435 are used by other local projects)
+      - "5437:5432"
+    volumes:
+      - sms_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sms -d school_management"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: sms_redis
+    restart: unless-stopped
+    ports:
+      - "6381:6379"
+    volumes:
+      - sms_redis_data:/data
+
+volumes:
+  sms_pg_data:
+  sms_redis_data:

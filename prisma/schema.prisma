@@ -1,0 +1,438 @@
+// School Management System — core schema (Foundation milestone)
+// Multi-tenant (per-school isolation), RBAC, and core academic entities.
+// Conventions: every table has createdAt/updatedAt; tenant data is soft-deleted
+// via deletedAt; foreign keys are indexed.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Enums
+// ─────────────────────────────────────────────────────────────────────────────
+
+enum UserRole {
+  SUPER_ADMIN
+  SCHOOL_ADMIN
+  PRINCIPAL
+  TEACHER
+  STUDENT
+  PARENT
+  ACCOUNTANT
+  LIBRARIAN
+}
+
+enum UserStatus {
+  ACTIVE
+  INVITED
+  SUSPENDED
+  DISABLED
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+  UNDISCLOSED
+}
+
+enum BloodGroup {
+  A_POSITIVE
+  A_NEGATIVE
+  B_POSITIVE
+  B_NEGATIVE
+  AB_POSITIVE
+  AB_NEGATIVE
+  O_POSITIVE
+  O_NEGATIVE
+  UNKNOWN
+}
+
+enum AcademicYearStatus {
+  UPCOMING
+  ACTIVE
+  ARCHIVED
+}
+
+enum EnrollmentStatus {
+  ACTIVE
+  PROMOTED
+  TRANSFERRED
+  GRADUATED
+  SUSPENDED
+  WITHDRAWN
+  ALUMNI
+}
+
+enum GuardianRelation {
+  FATHER
+  MOTHER
+  GRANDPARENT
+  SIBLING
+  UNCLE
+  AUNT
+  LEGAL_GUARDIAN
+  OTHER
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Tenancy
+// ─────────────────────────────────────────────────────────────────────────────
+
+model School {
+  id       String  @id @default(cuid())
+  name     String
+  code     String  @unique // short slug used in URLs / IDs, e.g. "GHS"
+  email    String?
+  phone    String?
+  address  String?
+  city     String?
+  country  String? @default("Nepal")
+  logoUrl  String?
+  timezone String  @default("Asia/Kathmandu")
+  isActive Boolean @default(true)
+
+  users         User[]
+  academicYears AcademicYear[]
+  classes       SchoolClass[]
+  subjects      Subject[]
+  students      Student[]
+  teachers      Teacher[]
+  guardians     Guardian[]
+  enrollments   Enrollment[]
+  auditLogs     AuditLog[]
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@index([isActive])
+  @@map("schools")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Identity & Access (RBAC)
+// ─────────────────────────────────────────────────────────────────────────────
+
+model User {
+  id           String     @id @default(cuid())
+  email        String     @unique
+  passwordHash String
+  role         UserRole
+  status       UserStatus @default(ACTIVE)
+
+  firstName String
+  lastName  String
+  phone     String?
+  avatarUrl String?
+
+  // null for platform-level SUPER_ADMIN; set for school-scoped users
+  schoolId String?
+  school   School? @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  lastLoginAt   DateTime?
+  emailVerified DateTime?
+
+  refreshTokens RefreshToken[]
+  permissions   UserPermission[]
+  auditLogs     AuditLog[]
+
+  // Profile back-relations (a user is at most one of these)
+  teacherProfile  Teacher?
+  studentProfile  Student?
+  guardianProfile Guardian?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@index([schoolId])
+  @@index([role])
+  @@map("users")
+}
+
+model RefreshToken {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String    @unique // sha-256 of the opaque token
+  userAgent String?
+  ip        String?
+  expiresAt DateTime
+  revokedAt DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("refresh_tokens")
+}
+
+// Permission catalog (data-driven mirror of the code-level permission matrix).
+model Permission {
+  id          String  @id @default(cuid())
+  key         String  @unique // e.g. "student:create"
+  description String?
+
+  users UserPermission[]
+
+  createdAt DateTime @default(now())
+
+  @@map("permissions")
+}
+
+// Per-user permission grants (overrides on top of role defaults).
+model UserPermission {
+  id           String     @id @default(cuid())
+  userId       String
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  permissionId String
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+  granted      Boolean    @default(true) // false = explicit deny
+
+  createdAt DateTime @default(now())
+
+  @@unique([userId, permissionId])
+  @@index([permissionId])
+  @@map("user_permissions")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Academic structure
+// ─────────────────────────────────────────────────────────────────────────────
+
+model AcademicYear {
+  id        String             @id @default(cuid())
+  schoolId  String
+  school    School             @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  name      String // e.g. "2024-2025"
+  startDate DateTime
+  endDate   DateTime
+  status    AcademicYearStatus @default(UPCOMING)
+
+  enrollments Enrollment[]
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@unique([schoolId, name])
+  @@index([schoolId])
+  @@map("academic_years")
+}
+
+model SchoolClass {
+  id       String  @id @default(cuid())
+  schoolId String
+  school   School  @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  name     String // e.g. "Grade 10"
+  code     String // e.g. "G10"
+  stream   String? // e.g. "Science", "Management" (higher grades)
+  capacity Int     @default(40)
+
+  sections Section[]
+  subjects Subject[]
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@unique([schoolId, code])
+  @@index([schoolId])
+  @@map("classes")
+}
+
+model Section {
+  id             String      @id @default(cuid())
+  classId        String
+  class          SchoolClass @relation(fields: [classId], references: [id], onDelete: Cascade)
+  name           String // e.g. "A"
+  capacity       Int         @default(40)
+  classTeacherId String?
+  classTeacher   Teacher?    @relation("SectionClassTeacher", fields: [classTeacherId], references: [id], onDelete: SetNull)
+
+  enrollments Enrollment[]
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@unique([classId, name])
+  @@index([classId])
+  @@index([classTeacherId])
+  @@map("sections")
+}
+
+model Subject {
+  id       String       @id @default(cuid())
+  schoolId String
+  school   School       @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  classId  String?
+  class    SchoolClass? @relation(fields: [classId], references: [id], onDelete: SetNull)
+  name     String
+  code     String
+  credits  Int          @default(1)
+
+  teachers Teacher[] @relation("TeacherSubjects")
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@unique([schoolId, code])
+  @@index([schoolId])
+  @@index([classId])
+  @@map("subjects")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// People: Teachers, Students, Guardians
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Teacher {
+  id       String @id @default(cuid())
+  schoolId String
+  school   School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  userId   String @unique
+  user     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  employeeId    String
+  qualification String?
+  experienceYrs Int       @default(0)
+  joinedOn      DateTime?
+
+  subjects    Subject[] @relation("TeacherSubjects")
+  sectionsLed Section[] @relation("SectionClassTeacher")
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@unique([schoolId, employeeId])
+  @@index([schoolId])
+  @@map("teachers")
+}
+
+model Student {
+  id       String @id @default(cuid())
+  schoolId String
+  school   School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  userId   String @unique
+  user     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  admissionNumber String
+  rollNumber      String?
+  dateOfBirth     DateTime?
+  gender          Gender           @default(UNDISCLOSED)
+  bloodGroup      BloodGroup       @default(UNKNOWN)
+  nationality     String?          @default("Nepali")
+  address         String?
+  admittedOn      DateTime?
+  status          EnrollmentStatus @default(ACTIVE)
+
+  guardians   StudentGuardian[]
+  enrollments Enrollment[]
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@unique([schoolId, admissionNumber])
+  @@index([schoolId])
+  @@index([status])
+  @@map("students")
+}
+
+model Guardian {
+  id       String @id @default(cuid())
+  schoolId String
+  school   School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  userId   String @unique
+  user     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  occupation String?
+  address    String?
+
+  students StudentGuardian[]
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@index([schoolId])
+  @@map("guardians")
+}
+
+// Many-to-many: a student may have multiple guardians and vice-versa.
+model StudentGuardian {
+  id         String           @id @default(cuid())
+  studentId  String
+  student    Student          @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  guardianId String
+  guardian   Guardian         @relation(fields: [guardianId], references: [id], onDelete: Cascade)
+  relation   GuardianRelation @default(OTHER)
+  isPrimary  Boolean          @default(false)
+
+  createdAt DateTime @default(now())
+
+  @@unique([studentId, guardianId])
+  @@index([guardianId])
+  @@map("student_guardians")
+}
+
+// A student's placement in a section for a given academic year (history-friendly).
+model Enrollment {
+  id             String           @id @default(cuid())
+  schoolId       String
+  school         School           @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  studentId      String
+  student        Student          @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  sectionId      String
+  section        Section          @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  academicYearId String
+  academicYear   AcademicYear     @relation(fields: [academicYearId], references: [id], onDelete: Cascade)
+  rollNumber     String?
+  status         EnrollmentStatus @default(ACTIVE)
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@unique([studentId, academicYearId])
+  @@index([schoolId])
+  @@index([sectionId])
+  @@index([academicYearId])
+  @@map("enrollments")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Audit
+// ─────────────────────────────────────────────────────────────────────────────
+
+model AuditLog {
+  id       String  @id @default(cuid())
+  schoolId String?
+  school   School? @relation(fields: [schoolId], references: [id], onDelete: SetNull)
+  userId   String?
+  user     User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  action     String // e.g. "auth.login", "student.create"
+  entityType String? // e.g. "Student"
+  entityId   String?
+  metadata   Json?
+  ip         String?
+  userAgent  String?
+
+  createdAt DateTime @default(now())
+
+  @@index([schoolId])
+  @@index([userId])
+  @@index([action])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
