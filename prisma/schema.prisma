@@ -80,6 +80,13 @@ enum GuardianRelation {
   OTHER
 }
 
+enum AttendanceStatus {
+  PRESENT
+  ABSENT
+  LATE
+  LEAVE
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Tenancy
 // ─────────────────────────────────────────────────────────────────────────────
@@ -106,6 +113,7 @@ model School {
   guardians     Guardian[]
   enrollments   Enrollment[]
   auditLogs     AuditLog[]
+  attendance    Attendance[]
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -141,6 +149,7 @@ model User {
   refreshTokens RefreshToken[]
   permissions   UserPermission[]
   auditLogs     AuditLog[]
+  markedAttendance Attendance[] @relation("MarkedAttendance")
 
   // Profile back-relations (a user is at most one of these)
   teacherProfile  Teacher?
@@ -257,6 +266,7 @@ model Section {
   classTeacher   Teacher?    @relation("SectionClassTeacher", fields: [classTeacherId], references: [id], onDelete: SetNull)
 
   enrollments Enrollment[]
+  attendance  Attendance[]
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -337,6 +347,7 @@ model Student {
 
   guardians   StudentGuardian[]
   enrollments Enrollment[]
+  attendance  Attendance[]
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -408,6 +419,39 @@ model Enrollment {
   @@index([sectionId])
   @@index([academicYearId])
   @@map("enrollments")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Audit
+// ─────────────────────────────────────────────────────────────────────────────
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Attendance
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Attendance {
+  id         String           @id @default(cuid())
+  schoolId   String
+  school     School           @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  sectionId  String
+  section    Section          @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  studentId  String
+  student    Student          @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  date       DateTime         @db.Date
+  status     AttendanceStatus @default(PRESENT)
+  remark     String?
+  markedById String?
+  markedBy   User?            @relation("MarkedAttendance", fields: [markedById], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // One record per student per day.
+  @@unique([studentId, date])
+  @@index([schoolId])
+  @@index([sectionId, date])
+  @@index([date])
+  @@map("attendance")
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

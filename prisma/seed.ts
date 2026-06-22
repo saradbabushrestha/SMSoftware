@@ -278,6 +278,45 @@ async function main() {
   }
   console.log(`  ✓ subjects assigned to ${allTeachers.length} teachers`);
 
+  // 10) Demo attendance for Grade 10 · A over recent weekdays.
+  const section10A = await db.section.findFirst({
+    where: { name: "A", class: { code: "G10", schoolId: school.id } },
+  });
+  if (section10A) {
+    const roster = await db.enrollment.findMany({
+      where: { sectionId: section10A.id, deletedAt: null },
+      select: { studentId: true },
+    });
+    const markedBy = demoUsers.TEACHER.id;
+    let attendanceRecords = 0;
+    const today = new Date();
+    const base = Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate());
+    for (let d = 0; d < 20; d++) {
+      const date = new Date(base - d * 86400000);
+      const dow = date.getUTCDay();
+      if (dow === 0 || dow === 6) continue; // skip weekends
+      for (let s = 0; s < roster.length; s++) {
+        // Mostly present, with deterministic variety so percentages look real.
+        const seed = (s + d) % 10;
+        const status = seed === 0 ? "ABSENT" : seed === 3 ? "LATE" : seed === 7 ? "LEAVE" : "PRESENT";
+        await db.attendance.upsert({
+          where: { studentId_date: { studentId: roster[s].studentId, date } },
+          update: { status, sectionId: section10A.id, markedById: markedBy },
+          create: {
+            schoolId: school.id,
+            sectionId: section10A.id,
+            studentId: roster[s].studentId,
+            date,
+            status,
+            markedById: markedBy,
+          },
+        });
+        attendanceRecords++;
+      }
+    }
+    console.log(`  ✓ ${attendanceRecords} attendance records for Grade 10 · A`);
+  }
+
   console.log("✅ Seed complete.");
 }
 
