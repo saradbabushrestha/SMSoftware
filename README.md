@@ -6,10 +6,11 @@ with **PostgreSQL** + **Prisma**, role-based access control for 8 user types,
 JWT sessions with rotating refresh tokens, and a premium light/dark design system.
 
 > **Status.** Foundation complete (auth, RBAC, multi-tenant data model, design
-> system, role-aware dashboards) **plus seven real modules — Students, Teachers,
-> Classes & Sections, Guardians, Subjects, Attendance, and Exams & Grades**. The
-> remaining modules (fees, library, …) build on this foundation; each is
-> reachable in the sidebar and currently shows a "module in progress" page.
+> system, role-aware dashboards) **plus eight real modules — Students, Teachers,
+> Classes & Sections, Guardians, Subjects, Attendance, Exams & Grades, and
+> Fees & Payments**. The remaining modules (library, transport, hostel, events, …)
+> build on this foundation; each is reachable in the sidebar and currently shows
+> a "module in progress" page.
 
 ## Built modules
 
@@ -56,6 +57,14 @@ revalidated; lists are tenant-scoped, searchable, filterable and paginated.
   and a **publish** toggle that gates student/parent visibility.
 - Grades view is role-aware: staff browse per-exam result matrices; **students
   and parents see only their own / their children's** published results + GPA.
+
+**Fees & Payments** (`/dashboard/fees`, `/dashboard/payments`)
+- Invoices (category, amount, due date) with billed/collected/outstanding/overdue
+  stats; status auto-derives (Pending → Partial → Paid) from recorded payments.
+- Payments use **Nepal gateways — eSewa, Khalti, Fonepay** (plus cash/bank for
+  manual entry); no international gateways. Accountants/admins record payments;
+  **parents pay their children's invoices online** (demo gateway, generated
+  reference). Students & parents see only their own; a payment ledger lists all.
 
 ## Tech stack
 

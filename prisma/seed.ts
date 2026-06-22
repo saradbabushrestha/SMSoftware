@@ -356,6 +356,50 @@ async function main() {
     console.log(`  ✓ exam "${examName}" + ${resultCount} published results`);
   }
 
+  // 12) Demo fee invoices + payments (Nepal gateways) for Grade 10 students.
+  if (g10) {
+    const g10Students = await db.enrollment.findMany({
+      where: { section: { classId: g10.id }, deletedAt: null },
+      include: { student: true },
+    });
+    const accountant = demoUsers.ACCOUNTANT.id;
+    const ensureInvoice = async (
+      studentId: string,
+      title: string,
+      category: "TUITION" | "TRANSPORT",
+      amount: number,
+      dueDate: Date,
+    ) => {
+      let inv = await db.invoice.findFirst({ where: { studentId, title, deletedAt: null } });
+      if (!inv) inv = await db.invoice.create({ data: { schoolId: school.id, studentId, category, title, amount, dueDate } });
+      return inv;
+    };
+    const addPayment = async (invoiceId: string, amount: number, method: "ESEWA" | "KHALTI", reference: string) => {
+      if ((await db.payment.count({ where: { invoiceId } })) > 0) return;
+      await db.payment.create({ data: { schoolId: school.id, invoiceId, amount, method, reference, recordedById: accountant } });
+      const inv = await db.invoice.findUniqueOrThrow({ where: { id: invoiceId } });
+      const paid = (await db.payment.aggregate({ where: { invoiceId }, _sum: { amount: true } }))._sum.amount ?? 0;
+      await db.invoice.update({
+        where: { id: invoiceId },
+        data: { status: paid >= inv.amount ? "PAID" : paid > 0 ? "PARTIAL" : "PENDING" },
+      });
+    };
+
+    let invoiceCount = 0;
+    for (const e of g10Students) {
+      // Tuition for everyone (future due), transport for everyone (past due → overdue if unpaid).
+      const tuition = await ensureInvoice(e.studentId, "Tuition fee — Term 1", "TUITION", 24000, new Date(Date.now() + 30 * 86400000));
+      const transport = await ensureInvoice(e.studentId, "Transport — Term 1", "TRANSPORT", 6000, new Date(Date.now() - 10 * 86400000));
+      invoiceCount += 2;
+      // The demo student (ADM-0001) shows a paid tuition + partial transport.
+      if (e.student.admissionNumber === "ADM-0001") {
+        await addPayment(tuition.id, 24000, "ESEWA", "ESEWA-DEMO0001");
+        await addPayment(transport.id, 3000, "KHALTI", "KHALTI-DEMO0001");
+      }
+    }
+    console.log(`  ✓ ${invoiceCount} invoices + demo eSewa/Khalti payments`);
+  }
+
   console.log("✅ Seed complete.");
 }
 

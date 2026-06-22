@@ -94,6 +94,31 @@ enum ExamType {
   PRACTICAL
 }
 
+enum FeeCategory {
+  TUITION
+  EXAMINATION
+  TRANSPORT
+  HOSTEL
+  LIBRARY
+  OTHER
+}
+
+enum InvoiceStatus {
+  PENDING
+  PARTIAL
+  PAID
+  CANCELLED
+}
+
+// Nepal payment gateways (+ manual cash/bank). No international gateways.
+enum PaymentMethod {
+  ESEWA
+  KHALTI
+  FONEPAY
+  CASH
+  BANK
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Tenancy
 // ─────────────────────────────────────────────────────────────────────────────
@@ -122,6 +147,8 @@ model School {
   auditLogs     AuditLog[]
   attendance    Attendance[]
   exams         Exam[]
+  invoices      Invoice[]
+  payments      Payment[]
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -158,6 +185,7 @@ model User {
   permissions   UserPermission[]
   auditLogs     AuditLog[]
   markedAttendance Attendance[] @relation("MarkedAttendance")
+  recordedPayments Payment[]    @relation("RecordedPayments")
 
   // Profile back-relations (a user is at most one of these)
   teacherProfile  Teacher?
@@ -360,6 +388,7 @@ model Student {
   enrollments Enrollment[]
   attendance  Attendance[]
   examResults ExamResult[]
+  invoices    Invoice[]
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -485,6 +514,56 @@ model ExamResult {
   @@index([examId])
   @@index([studentId])
   @@map("exam_results")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Finance: invoices & payments
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Invoice {
+  id        String        @id @default(cuid())
+  schoolId  String
+  school    School        @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  studentId String
+  student   Student       @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  category  FeeCategory   @default(TUITION)
+  title     String
+  amount    Float
+  dueDate   DateTime?     @db.Date
+  status    InvoiceStatus @default(PENDING)
+  note      String?
+
+  payments Payment[]
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@index([schoolId])
+  @@index([studentId])
+  @@index([status])
+  @@map("invoices")
+}
+
+model Payment {
+  id           String        @id @default(cuid())
+  schoolId     String
+  school       School        @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  invoiceId    String
+  invoice      Invoice       @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  amount       Float
+  method       PaymentMethod @default(ESEWA)
+  reference    String? // gateway transaction id / receipt no.
+  paidAt       DateTime      @default(now())
+  recordedById String?
+  recordedBy   User?         @relation("RecordedPayments", fields: [recordedById], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+
+  @@index([schoolId])
+  @@index([invoiceId])
+  @@index([paidAt])
+  @@map("payments")
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
