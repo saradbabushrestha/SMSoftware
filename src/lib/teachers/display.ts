@@ -1,23 +1,9 @@
-import type { UserStatus } from "@prisma/client";
+import { USER_STATUS_ACTIONS } from "@/lib/users/status";
 
-export const USER_STATUS_LABELS: Record<UserStatus, string> = {
-  ACTIVE: "Active",
-  INVITED: "Invited",
-  SUSPENDED: "Suspended",
-  DISABLED: "Disabled",
-};
-
-type BadgeVariant = "default" | "secondary" | "success" | "warning" | "destructive" | "info" | "outline";
-
-export const USER_STATUS_VARIANT: Record<UserStatus, BadgeVariant> = {
-  ACTIVE: "success",
-  INVITED: "info",
-  SUSPENDED: "warning",
-  DISABLED: "secondary",
-};
+export { USER_STATUS_LABELS, USER_STATUS_VARIANT } from "@/lib/users/status";
 
 /** Statuses an admin can toggle a teacher between from the UI. */
-export const TEACHER_STATUS_ACTIONS: UserStatus[] = ["ACTIVE", "SUSPENDED"];
+export const TEACHER_STATUS_ACTIONS = USER_STATUS_ACTIONS;
 
 export function fullName(first: string, last: string) {
   return `${first} ${last}`.trim();

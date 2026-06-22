@@ -6,10 +6,10 @@ with **PostgreSQL** + **Prisma**, role-based access control for 8 user types,
 JWT sessions with rotating refresh tokens, and a premium light/dark design system.
 
 > **Status.** Foundation complete (auth, RBAC, multi-tenant data model, design
-> system, role-aware dashboards) **plus three real modules — Students, Teachers
-> and Classes & Sections** (full CRUD). The remaining modules (attendance, exams,
-> fees, library, …) build on this foundation; each is reachable in the sidebar
-> and currently shows a "module in progress" page.
+> system, role-aware dashboards) **plus four real modules — Students, Teachers,
+> Classes & Sections, and Guardians** (full CRUD). The remaining modules
+> (attendance, exams, fees, library, …) build on this foundation; each is
+> reachable in the sidebar and currently shows a "module in progress" page.
 
 ## Built modules
 
@@ -32,6 +32,11 @@ revalidated; lists are tenant-scoped, searchable, filterable and paginated.
   inline **sections manager** (add/edit/delete sections in a modal, assign a
   class teacher); create/edit class forms (unique code per school); soft-delete
   cascades to sections while preserving enrollment history.
+
+**Guardians** (`/dashboard/guardians`)
+- List with search + status filter and children counts; guardian profile with a
+  **students linker** (link/edit/unlink children, set relationship, enforce a
+  single primary guardian per student); create/edit forms; soft-delete.
 
 ## Tech stack
 
