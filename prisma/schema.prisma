@@ -119,6 +119,11 @@ enum PaymentMethod {
   BANK
 }
 
+enum LoanStatus {
+  BORROWED
+  RETURNED
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Tenancy
 // ─────────────────────────────────────────────────────────────────────────────
@@ -149,6 +154,8 @@ model School {
   exams         Exam[]
   invoices      Invoice[]
   payments      Payment[]
+  books         Book[]
+  bookLoans     BookLoan[]
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -186,6 +193,7 @@ model User {
   auditLogs     AuditLog[]
   markedAttendance Attendance[] @relation("MarkedAttendance")
   recordedPayments Payment[]    @relation("RecordedPayments")
+  bookLoans        BookLoan[]   @relation("BookLoans")
 
   // Profile back-relations (a user is at most one of these)
   teacherProfile  Teacher?
@@ -564,6 +572,53 @@ model Payment {
   @@index([invoiceId])
   @@index([paidAt])
   @@map("payments")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Library
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Book {
+  id              String  @id @default(cuid())
+  schoolId        String
+  school          School  @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  title           String
+  author          String
+  isbn            String?
+  category        String?
+  totalCopies     Int     @default(1)
+  availableCopies Int     @default(1)
+
+  loans BookLoan[]
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@index([schoolId])
+  @@map("books")
+}
+
+model BookLoan {
+  id         String     @id @default(cuid())
+  schoolId   String
+  school     School     @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  bookId     String
+  book       Book       @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  memberId   String
+  member     User       @relation("BookLoans", fields: [memberId], references: [id], onDelete: Cascade)
+  borrowedAt DateTime   @default(now())
+  dueDate    DateTime   @db.Date
+  returnedAt DateTime?
+  status     LoanStatus @default(BORROWED)
+
+  createdAt DateTime @default(now())
+
+  @@index([schoolId])
+  @@index([bookId])
+  @@index([memberId])
+  @@index([status])
+  @@map("book_loans")
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

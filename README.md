@@ -6,11 +6,11 @@ with **PostgreSQL** + **Prisma**, role-based access control for 8 user types,
 JWT sessions with rotating refresh tokens, and a premium light/dark design system.
 
 > **Status.** Foundation complete (auth, RBAC, multi-tenant data model, design
-> system, role-aware dashboards) **plus eight real modules — Students, Teachers,
-> Classes & Sections, Guardians, Subjects, Attendance, Exams & Grades, and
-> Fees & Payments**. The remaining modules (library, transport, hostel, events, …)
-> build on this foundation; each is reachable in the sidebar and currently shows
-> a "module in progress" page.
+> system, role-aware dashboards) **plus nine real modules — Students, Teachers,
+> Classes & Sections, Guardians, Subjects, Attendance, Exams & Grades,
+> Fees & Payments, and Library**. The remaining modules (transport, hostel,
+> events, timetable, …) build on this foundation; each is reachable in the
+> sidebar and currently shows a "module in progress" page.
 
 ## Built modules
 
@@ -65,6 +65,12 @@ revalidated; lists are tenant-scoped, searchable, filterable and paginated.
   manual entry); no international gateways. Accountants/admins record payments;
   **parents pay their children's invoices online** (demo gateway, generated
   reference). Students & parents see only their own; a payment ledger lists all.
+
+**Library** (`/dashboard/library`)
+- Book catalog with search + category filter and availability (available/total);
+  **issue** a copy to a student/teacher and **return** it, with live copy-count
+  updates and **overdue fines** (₨/day). Librarians & admins manage; **students
+  browse and see their own borrowed books** with due dates and fines.
 
 ## Tech stack
 

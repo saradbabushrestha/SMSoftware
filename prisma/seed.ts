@@ -400,6 +400,34 @@ async function main() {
     console.log(`  ✓ ${invoiceCount} invoices + demo eSewa/Khalti payments`);
   }
 
+  // 13) Demo library: books + a couple of loans (one overdue).
+  const bookDefs = [
+    { title: "A Brief History of Time", author: "Stephen Hawking", category: "Science", totalCopies: 3 },
+    { title: "To Kill a Mockingbird", author: "Harper Lee", category: "Fiction", totalCopies: 4 },
+    { title: "Clean Code", author: "Robert C. Martin", category: "Reference", totalCopies: 2 },
+    { title: "Sapiens", author: "Yuval Noah Harari", category: "History", totalCopies: 3 },
+    { title: "The Hobbit", author: "J.R.R. Tolkien", category: "Fiction", totalCopies: 5 },
+  ];
+  const books: Record<string, { id: string; availableCopies: number; totalCopies: number }> = {};
+  for (const b of bookDefs) {
+    let book = await db.book.findFirst({ where: { schoolId: school.id, title: b.title, deletedAt: null } });
+    if (!book) book = await db.book.create({ data: { schoolId: school.id, ...b, availableCopies: b.totalCopies } });
+    books[b.title] = book;
+  }
+
+  const addLoan = async (title: string, memberId: string, dueDate: Date) => {
+    const book = books[title];
+    const existing = await db.bookLoan.count({ where: { bookId: book.id, memberId, status: "BORROWED" } });
+    if (existing > 0 || book.availableCopies <= 0) return;
+    await db.bookLoan.create({ data: { schoolId: school.id, bookId: book.id, memberId, dueDate, status: "BORROWED" } });
+    await db.book.update({ where: { id: book.id }, data: { availableCopies: { decrement: 1 } } });
+    book.availableCopies -= 1;
+  };
+  // Demo student has an overdue book; demo teacher has a current loan.
+  await addLoan("A Brief History of Time", demoUsers.STUDENT.id, new Date(Date.now() - 7 * 86400000));
+  await addLoan("Clean Code", demoUsers.TEACHER.id, new Date(Date.now() + 7 * 86400000));
+  console.log(`  ✓ ${bookDefs.length} books + demo loans`);
+
   console.log("✅ Seed complete.");
 }
 
