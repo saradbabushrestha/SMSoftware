@@ -317,6 +317,45 @@ async function main() {
     console.log(`  ✓ ${attendanceRecords} attendance records for Grade 10 · A`);
   }
 
+  // 11) Demo exam + published grades for Grade 10.
+  const g10 = await db.schoolClass.findFirst({ where: { code: "G10", schoolId: school.id } });
+  if (g10) {
+    const examName = "Mid-Term Examination 2024";
+    let exam = await db.exam.findFirst({ where: { schoolId: school.id, classId: g10.id, name: examName, deletedAt: null } });
+    if (!exam) {
+      exam = await db.exam.create({
+        data: {
+          schoolId: school.id,
+          classId: g10.id,
+          academicYearId: academicYear.id,
+          name: examName,
+          type: "MIDTERM",
+          maxMarks: 100,
+          examDate: new Date("2024-09-15"),
+          published: true,
+        },
+      });
+    }
+    const g10Roster = await db.enrollment.findMany({
+      where: { section: { classId: g10.id }, deletedAt: null },
+      select: { studentId: true },
+    });
+    const gradedSubjects = [byCode("MATH"), byCode("SCI"), byCode("ENG")];
+    let resultCount = 0;
+    for (let s = 0; s < g10Roster.length; s++) {
+      for (let j = 0; j < gradedSubjects.length; j++) {
+        const marks = 55 + ((s * 7 + j * 11) % 45); // deterministic 55–99
+        await db.examResult.upsert({
+          where: { examId_studentId_subjectId: { examId: exam.id, studentId: g10Roster[s].studentId, subjectId: gradedSubjects[j].id } },
+          update: { marksObtained: marks, maxMarks: 100 },
+          create: { examId: exam.id, studentId: g10Roster[s].studentId, subjectId: gradedSubjects[j].id, marksObtained: marks, maxMarks: 100 },
+        });
+        resultCount++;
+      }
+    }
+    console.log(`  ✓ exam "${examName}" + ${resultCount} published results`);
+  }
+
   console.log("✅ Seed complete.");
 }
 

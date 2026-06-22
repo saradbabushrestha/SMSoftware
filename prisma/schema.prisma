@@ -87,6 +87,13 @@ enum AttendanceStatus {
   LEAVE
 }
 
+enum ExamType {
+  UNIT_TEST
+  MIDTERM
+  FINAL
+  PRACTICAL
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Tenancy
 // ─────────────────────────────────────────────────────────────────────────────
@@ -114,6 +121,7 @@ model School {
   enrollments   Enrollment[]
   auditLogs     AuditLog[]
   attendance    Attendance[]
+  exams         Exam[]
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -225,6 +233,7 @@ model AcademicYear {
   status    AcademicYearStatus @default(UPCOMING)
 
   enrollments Enrollment[]
+  exams       Exam[]
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -246,6 +255,7 @@ model SchoolClass {
 
   sections Section[]
   subjects Subject[]
+  exams    Exam[]
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -288,7 +298,8 @@ model Subject {
   code     String
   credits  Int          @default(1)
 
-  teachers Teacher[] @relation("TeacherSubjects")
+  teachers    Teacher[]     @relation("TeacherSubjects")
+  examResults ExamResult[]
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -348,6 +359,7 @@ model Student {
   guardians   StudentGuardian[]
   enrollments Enrollment[]
   attendance  Attendance[]
+  examResults ExamResult[]
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -424,6 +436,56 @@ model Enrollment {
 // ─────────────────────────────────────────────────────────────────────────────
 // Audit
 // ─────────────────────────────────────────────────────────────────────────────
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Examinations & grading
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Exam {
+  id             String        @id @default(cuid())
+  schoolId       String
+  school         School        @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  classId        String
+  class          SchoolClass   @relation(fields: [classId], references: [id], onDelete: Cascade)
+  academicYearId String?
+  academicYear   AcademicYear? @relation(fields: [academicYearId], references: [id], onDelete: SetNull)
+  name           String // e.g. "Mid-Term 2024"
+  type           ExamType      @default(MIDTERM)
+  maxMarks       Int           @default(100)
+  examDate       DateTime?     @db.Date
+  published      Boolean       @default(false) // visible to students/parents when true
+
+  results ExamResult[]
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@index([schoolId])
+  @@index([classId])
+  @@map("exams")
+}
+
+model ExamResult {
+  id            String  @id @default(cuid())
+  examId        String
+  exam          Exam    @relation(fields: [examId], references: [id], onDelete: Cascade)
+  studentId     String
+  student       Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  subjectId     String
+  subject       Subject @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  marksObtained Float
+  maxMarks      Int     @default(100)
+  remark        String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([examId, studentId, subjectId])
+  @@index([examId])
+  @@index([studentId])
+  @@map("exam_results")
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Attendance

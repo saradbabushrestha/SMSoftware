@@ -6,10 +6,10 @@ with **PostgreSQL** + **Prisma**, role-based access control for 8 user types,
 JWT sessions with rotating refresh tokens, and a premium light/dark design system.
 
 > **Status.** Foundation complete (auth, RBAC, multi-tenant data model, design
-> system, role-aware dashboards) **plus six real modules — Students, Teachers,
-> Classes & Sections, Guardians, Subjects, and Attendance**. The remaining
-> modules (exams, fees, library, …) build on this foundation; each is reachable
-> in the sidebar and currently shows a "module in progress" page.
+> system, role-aware dashboards) **plus seven real modules — Students, Teachers,
+> Classes & Sections, Guardians, Subjects, Attendance, and Exams & Grades**. The
+> remaining modules (fees, library, …) build on this foundation; each is
+> reachable in the sidebar and currently shows a "module in progress" page.
 
 ## Built modules
 
@@ -49,6 +49,13 @@ revalidated; lists are tenant-scoped, searchable, filterable and paginated.
 - Role-aware: admins & teachers mark; principals view the roster read-only;
   **students and parents see only their own / their children's** attendance with
   a percentage and recent history.
+
+**Exams & Grades** (`/dashboard/exams`, `/dashboard/grades`)
+- Exam CRUD (type, class, max marks, date) + a **schedule list** everyone can see.
+- Per-subject **grade entry** with a live letter-grade/GPA preview (4.0 scale),
+  and a **publish** toggle that gates student/parent visibility.
+- Grades view is role-aware: staff browse per-exam result matrices; **students
+  and parents see only their own / their children's** published results + GPA.
 
 ## Tech stack
 
