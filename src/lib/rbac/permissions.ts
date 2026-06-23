@@ -85,6 +85,7 @@ export const PERMISSIONS = {
   "event:view": "View events",
   "event:manage": "Manage events",
   "message:send": "Send messages",
+  "announcement:view": "View announcements",
   "announcement:manage": "Create announcements",
 
   // Reports & audit
@@ -148,6 +149,7 @@ const ROLE_MATRIX: Record<UserRole, PermissionKey[] | typeof ALL> = {
     "event:view",
     "event:manage",
     "message:send",
+    "announcement:view",
     "announcement:manage",
     "report:view",
     "audit:view",
@@ -173,6 +175,7 @@ const ROLE_MATRIX: Record<UserRole, PermissionKey[] | typeof ALL> = {
     "event:view",
     "event:manage",
     "message:send",
+    "announcement:view",
     "announcement:manage",
     "report:view",
     "report:approve",
@@ -195,6 +198,7 @@ const ROLE_MATRIX: Record<UserRole, PermissionKey[] | typeof ALL> = {
     "assignment:manage",
     "event:view",
     "message:send",
+    "announcement:view",
     "report:view",
   ],
 
@@ -212,6 +216,7 @@ const ROLE_MATRIX: Record<UserRole, PermissionKey[] | typeof ALL> = {
     "library:view",
     "event:view",
     "message:send",
+    "announcement:view",
   ],
 
   PARENT: [
@@ -225,6 +230,7 @@ const ROLE_MATRIX: Record<UserRole, PermissionKey[] | typeof ALL> = {
     "payment:make",
     "event:view",
     "message:send",
+    "announcement:view",
     "report:view",
   ],
 
@@ -241,6 +247,8 @@ const ROLE_MATRIX: Record<UserRole, PermissionKey[] | typeof ALL> = {
     "accounting:view",
     "accounting:manage",
     "report:view",
+    "message:send",
+    "announcement:view",
   ],
 
   LIBRARIAN: [
@@ -251,6 +259,7 @@ const ROLE_MATRIX: Record<UserRole, PermissionKey[] | typeof ALL> = {
     "library:manage",
     "event:view",
     "message:send",
+    "announcement:view",
     "report:view",
   ],
 };

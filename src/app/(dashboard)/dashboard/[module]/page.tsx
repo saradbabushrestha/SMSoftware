@@ -20,7 +20,7 @@ const MODULE_BLURB: Record<string, string> = {
   grades: "GPA, percentage, letter grades and rank calculation.",
   assignments: "Create, submit, auto-grade and track submissions.",
   fees: "Fee structures, invoices, discounts and scholarships.",
-  payments: "Stripe, PayPal and Nepal gateways (eSewa, Khalti, Fonepay).",
+  payments: "Nepal gateways — eSewa, Khalti, Fonepay — plus cash and bank.",
   payroll: "Salaries, bonuses, deductions, tax and payslips.",
   accounting: "Income, expense, ledgers and financial statements.",
   library: "Catalog, barcode borrowing, returns and fines.",

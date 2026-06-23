@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, Pencil, Receipt } from "lucide-react";
+import { ArrowLeft, Pencil, Receipt, CheckCircle2, XCircle, Info, Download } from "lucide-react";
 import { requirePermission, can } from "@/lib/rbac/authorize";
 import { db } from "@/lib/db";
 import { getInvoice } from "@/lib/fees/queries";
@@ -9,9 +9,23 @@ import { FEE_CATEGORY_LABELS, PAYMENT_METHOD_LABELS, displayStatus, formatNpr } 
 import { PageHeader } from "@/components/dashboard/page-header";
 import { Panel, EmptyState, ProgressBar } from "@/components/dashboard/widgets";
 import { RecordPaymentDialog } from "@/components/fees/record-payment-dialog";
+import { GatewayPayButtons } from "@/components/fees/gateway-pay-buttons";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
+
+const PAYMENT_NOTICE: Record<string, { text: string; tone: "success" | "error" | "info" }> = {
+  success: { text: "Payment successful — thank you!", tone: "success" },
+  failed: { text: "Payment was not completed. You can try again.", tone: "error" },
+  error: { text: "Something went wrong starting the payment. Please try again.", tone: "error" },
+  cancelled: { text: "This invoice has been cancelled.", tone: "info" },
+  settled: { text: "This invoice is already fully paid.", tone: "info" },
+  min: { text: "Khalti requires a minimum payment of ₨ 10.", tone: "info" },
+  denied: { text: "You don't have permission to pay this invoice.", tone: "error" },
+  invalid: { text: "Invalid payment request.", tone: "error" },
+  notfound: { text: "Invoice not found.", tone: "error" },
+};
 
 export const metadata: Metadata = { title: "Invoice" };
 
@@ -32,8 +46,15 @@ async function ownStudentIds(role: string, userId: string): Promise<string[] | u
   return undefined;
 }
 
-export default async function InvoiceDetailPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function InvoiceDetailPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ payment?: string }>;
+}) {
   const { id } = await params;
+  const sp = await searchParams;
   const user = await requirePermission("fee:view");
   const studentIds = await ownStudentIds(user.role, user.id);
   const invoice = await getInvoice(user, id, studentIds);
@@ -44,7 +65,10 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
   const canManagePay = can(user, "payment:manage");
   const canMakePay = can(user, "payment:make");
   const showPay = invoice.balance > 0 && invoice.status !== "CANCELLED" && (canManagePay || canMakePay);
+  const showGateway = showPay && !canManagePay && canMakePay; // parents pay online
   const pctPaid = invoice.amount > 0 ? Math.round((invoice.paid / invoice.amount) * 100) : 0;
+  const notice = sp.payment ? PAYMENT_NOTICE[sp.payment] : undefined;
+  const NoticeIcon = notice?.tone === "success" ? CheckCircle2 : notice?.tone === "error" ? XCircle : Info;
 
   return (
     <>
@@ -53,6 +77,21 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
           <ArrowLeft /> Back to fees
         </Link>
       </Button>
+
+      {notice ? (
+        <div
+          className={cn(
+            "mb-4 flex items-center gap-2 rounded-md border px-3 py-2.5 text-sm",
+            notice.tone === "success" && "border-success/30 bg-success/10 text-success",
+            notice.tone === "error" && "border-destructive/30 bg-destructive/10 text-destructive",
+            notice.tone === "info" && "border-border bg-muted/40 text-muted-foreground",
+          )}
+          role="status"
+        >
+          <NoticeIcon className="size-4 shrink-0" />
+          <span>{notice.text}</span>
+        </div>
+      ) : null}
 
       <PageHeader
         title={invoice.title}
@@ -63,7 +102,7 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
         }
         actions={
           <div className="flex items-center gap-2">
-            {showPay ? <RecordPaymentDialog invoiceId={invoice.id} balance={invoice.balance} canManage={canManagePay} /> : null}
+            {showPay && canManagePay ? <RecordPaymentDialog invoiceId={invoice.id} balance={invoice.balance} canManage={canManagePay} /> : null}
             {canFeeManage ? (
               <Button asChild variant="outline">
                 <Link href={`/dashboard/fees/${invoice.id}/edit`}>
@@ -104,6 +143,12 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
               </div>
               {invoice.note ? <p className="pt-1 text-xs text-muted-foreground">{invoice.note}</p> : null}
             </div>
+
+            {showGateway ? (
+              <div className="border-t pt-4">
+                <GatewayPayButtons invoiceId={invoice.id} balance={invoice.balance} />
+              </div>
+            ) : null}
           </CardContent>
         </Card>
 
@@ -123,7 +168,17 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
                         {p.recordedBy ? ` · by ${p.recordedBy.firstName} ${p.recordedBy.lastName}` : ""}
                       </p>
                     </div>
-                    <Badge variant="secondary">{PAYMENT_METHOD_LABELS[p.method]}</Badge>
+                    <div className="flex shrink-0 items-center gap-2">
+                      <Badge variant="secondary">{PAYMENT_METHOD_LABELS[p.method]}</Badge>
+                      <a
+                        href={`/api/payments/${p.id}/receipt`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+                      >
+                        <Download className="size-3.5" /> Receipt
+                      </a>
+                    </div>
                   </li>
                 ))}
               </ul>

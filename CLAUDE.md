@@ -32,5 +32,8 @@ Tailwind v4 · **Prisma 6** + PostgreSQL. No separate backend service.
 
 ## Verify
 
-- `npm run build` type-checks the whole app.
-- `node --env-file=.env --import tsx scripts/smoke.ts` runs auth + RBAC sanity checks.
+- `npm run verify` runs ESLint + `next build` (the build type-checks the whole app).
+  `next build` alone does **not** run ESLint, so use `verify` to catch lint.
+- `npm test` runs every `scripts/*-check.ts` data-layer suite + `smoke.ts`
+  (auth + RBAC sanity) via `scripts/check-all.ts`; exits non-zero on any failure.
+- Individual suite: `node --env-file=.env --import tsx scripts/<name>-check.ts`.

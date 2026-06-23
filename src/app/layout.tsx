@@ -20,6 +20,8 @@ export const metadata: Metadata = {
   },
   description:
     "Enterprise school management — students, teachers, attendance, exams, fees and more.",
+  // Internal application — keep it out of search engines.
+  robots: { index: false, follow: false },
 };
 
 export default function RootLayout({

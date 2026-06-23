@@ -4,18 +4,20 @@ import type { SessionUser } from "@/lib/auth/types";
 
 export function DashboardShell({
   user,
+  badges,
   children,
 }: {
   user: SessionUser;
+  badges?: Record<string, number>;
   children: React.ReactNode;
 }) {
   return (
     <div className="flex min-h-svh">
       <aside className="sticky top-0 hidden h-svh w-64 shrink-0 border-r lg:block">
-        <SidebarContent user={user} />
+        <SidebarContent user={user} badges={badges} />
       </aside>
       <div className="flex min-w-0 flex-1 flex-col">
-        <Topbar user={user} />
+        <Topbar user={user} badges={badges} />
         <main className="scrollbar-thin flex-1 px-4 py-6 md:px-6 lg:px-8">{children}</main>
       </div>
     </div>

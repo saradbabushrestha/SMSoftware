@@ -297,8 +297,22 @@ async function main() {
       if (dow === 0 || dow === 6) continue; // skip weekends
       for (let s = 0; s < roster.length; s++) {
         // Mostly present, with deterministic variety so percentages look real.
+        // The first student is intentionally an "at-risk" case (frequent absences).
         const seed = (s + d) % 10;
-        const status = seed === 0 ? "ABSENT" : seed === 3 ? "LATE" : seed === 7 ? "LEAVE" : "PRESENT";
+        const status =
+          s === 0
+            ? d % 3 === 0
+              ? "ABSENT"
+              : seed === 5
+                ? "LATE"
+                : "PRESENT"
+            : seed === 0
+              ? "ABSENT"
+              : seed === 3
+                ? "LATE"
+                : seed === 7
+                  ? "LEAVE"
+                  : "PRESENT";
         await db.attendance.upsert({
           where: { studentId_date: { studentId: roster[s].studentId, date } },
           update: { status, sectionId: section10A.id, markedById: markedBy },
@@ -427,6 +441,408 @@ async function main() {
   await addLoan("A Brief History of Time", demoUsers.STUDENT.id, new Date(Date.now() - 7 * 86400000));
   await addLoan("Clean Code", demoUsers.TEACHER.id, new Date(Date.now() + 7 * 86400000));
   console.log(`  ✓ ${bookDefs.length} books + demo loans`);
+
+  // 14b) Demo events + a registration (only when empty).
+  if ((await db.event.count({ where: { schoolId: school.id } })) === 0) {
+    const now = Date.now();
+    const D = 86400000;
+    const H = 3600000;
+    const defs = [
+      { title: "Parent–Teacher Meeting", type: "MEETING" as const, location: "Assembly hall", startsAt: now + 3 * D, endsAt: now + 3 * D + 3 * H, capacity: 200, description: "Term 1 progress discussion for all grades." },
+      { title: "Annual Sports Day", type: "SPORTS" as const, location: "Main ground", startsAt: now + 7 * D, endsAt: now + 7 * D + 6 * H, capacity: 0, description: "Track and field events for all grades." },
+      { title: "Inter-school Quiz Competition", type: "COMPETITION" as const, location: "Auditorium", startsAt: now + 14 * D, capacity: 50, description: "Represent the school in the regional quiz." },
+      { title: "Robotics Workshop", type: "WORKSHOP" as const, location: "Computer Lab", startsAt: now - 10 * D, endsAt: now - 10 * D + 3 * H, capacity: 30, description: "Hands-on introduction to robotics." },
+    ];
+    let sportsId = "";
+    for (const e of defs) {
+      const created = await db.event.create({
+        data: {
+          schoolId: school.id,
+          title: e.title,
+          type: e.type,
+          location: e.location,
+          description: e.description,
+          startsAt: new Date(e.startsAt),
+          endsAt: e.endsAt ? new Date(e.endsAt) : null,
+          capacity: e.capacity,
+          registrationOpen: true,
+          createdById: demoUsers.SCHOOL_ADMIN.id,
+        },
+      });
+      if (e.type === "SPORTS") sportsId = created.id;
+    }
+    if (sportsId) {
+      await db.eventRegistration.create({ data: { eventId: sportsId, userId: demoUsers.STUDENT.id } });
+    }
+    console.log(`  ✓ ${defs.length} events + 1 registration`);
+  }
+
+  // 14) Demo audit trail (only when empty — real actions append here at runtime).
+  if ((await db.auditLog.count({ where: { schoolId: school.id } })) === 0) {
+    const now = Date.now();
+    const H = 3_600_000;
+    const events: { action: string; userId: string | null; entityType?: string; metadata?: object; ip?: string; ago: number }[] = [
+      { action: "auth.login", userId: demoUsers.SCHOOL_ADMIN.id, ip: "27.34.18.5", ago: 0.5 * H },
+      { action: "student.create", userId: demoUsers.SCHOOL_ADMIN.id, entityType: "Student", metadata: { admissionNumber: "ADM-0042" }, ago: 1 * H },
+      { action: "attendance.mark", userId: demoUsers.TEACHER.id, entityType: "Section", metadata: { count: 28 }, ago: 2 * H },
+      { action: "payment.record", userId: demoUsers.ACCOUNTANT.id, entityType: "Invoice", metadata: { amount: 24000, method: "ESEWA" }, ago: 3 * H },
+      { action: "exam.publish", userId: demoUsers.TEACHER.id, entityType: "Exam", metadata: { published: true }, ago: 5 * H },
+      { action: "book.issue", userId: demoUsers.LIBRARIAN.id, entityType: "Book", ago: 7 * H },
+      { action: "auth.login.failed", userId: null, metadata: { email: "unknown@greenwood.edu" }, ip: "102.89.4.7", ago: 26 * H },
+      { action: "user.create", userId: demoUsers.SUPER_ADMIN.id, entityType: "User", metadata: { role: "ACCOUNTANT" }, ago: 30 * H },
+      { action: "invoice.create", userId: demoUsers.ACCOUNTANT.id, entityType: "Invoice", metadata: { amount: 6000 }, ago: 50 * H },
+      { action: "grade.save", userId: demoUsers.TEACHER.id, entityType: "Exam", metadata: { subjectId: "MATH", count: 3 }, ago: 72 * H },
+    ];
+    for (const e of events) {
+      await db.auditLog.create({
+        data: {
+          action: e.action,
+          userId: e.userId,
+          schoolId: e.userId === demoUsers.SUPER_ADMIN.id ? null : school.id,
+          entityType: e.entityType,
+          metadata: e.metadata,
+          ip: e.ip,
+          createdAt: new Date(now - e.ago),
+        },
+      });
+    }
+    console.log(`  ✓ ${events.length} demo audit events`);
+  }
+
+  // 15) Demo assignments + a graded submission for Grade 10 · A.
+  if (section10A && (await db.assignment.count({ where: { schoolId: school.id } })) === 0) {
+    const now = Date.now();
+    const D = 86400000;
+    const a1 = await db.assignment.create({
+      data: {
+        schoolId: school.id,
+        sectionId: section10A.id,
+        subjectId: byCode("MATH").id,
+        title: "Algebra worksheet",
+        description: "Complete exercises 1–10 from chapter 4 and show your working.",
+        dueDate: new Date(now + 3 * D),
+        maxPoints: 20,
+        createdById: demoUsers.TEACHER.id,
+      },
+    });
+    await db.assignment.create({
+      data: {
+        schoolId: school.id,
+        sectionId: section10A.id,
+        subjectId: byCode("ENG").id,
+        title: "Essay: My hometown",
+        description: "Write a 300-word descriptive essay about your hometown.",
+        dueDate: new Date(now - 2 * D),
+        maxPoints: 50,
+        createdById: demoUsers.TEACHER.id,
+      },
+    });
+    await db.submission.create({
+      data: {
+        assignmentId: a1.id,
+        studentId: demoStudent.id,
+        content: "x = 4; y = -2; (full working attached in notebook).",
+        status: "GRADED",
+        grade: 18,
+        feedback: "Great work — watch the sign on Q7.",
+        gradedAt: new Date(),
+        gradedById: demoUsers.TEACHER.id,
+      },
+    });
+    console.log("  ✓ 2 assignments + 1 graded submission");
+  }
+
+  // 16) Demo transport routes + student assignments (only when empty).
+  if ((await db.route.count({ where: { schoolId: school.id } })) === 0) {
+    const r1 = await db.route.create({
+      data: { schoolId: school.id, name: "Route 1 — Lakeside", vehicleNumber: "Ba 12 Pa 3456", driverName: "Krishna Tamang", driverPhone: "+977-9800000001", capacity: 30, fare: 3000, description: "Lakeside → School via Ring Road." },
+    });
+    await db.route.create({
+      data: { schoolId: school.id, name: "Route 2 — Hilltop", vehicleNumber: "Ba 9 Cha 1122", driverName: "Bikash Rai", driverPhone: "+977-9800000002", capacity: 25, fare: 2500, description: "Hilltop → School via Old Town." },
+    });
+    const riders = await db.student.findMany({ where: { schoolId: school.id, deletedAt: null }, orderBy: { admissionNumber: "asc" }, take: 3 });
+    for (const s of riders) {
+      await db.transportAssignment.create({ data: { routeId: r1.id, studentId: s.id, stop: "Main gate" } }).catch(() => undefined);
+    }
+    console.log(`  ✓ 2 routes + ${riders.length} riders`);
+  }
+
+  // 17) Demo hostel rooms + occupants (only when empty).
+  if ((await db.room.count({ where: { schoolId: school.id } })) === 0) {
+    const rm1 = await db.room.create({
+      data: { schoolId: school.id, block: "Block A", number: "101", gender: "BOYS", capacity: 3, wardenName: "Mr. Sharma", notes: "Ground floor, near common room." },
+    });
+    await db.room.create({
+      data: { schoolId: school.id, block: "Block B", number: "201", gender: "GIRLS", capacity: 3, wardenName: "Mrs. Karki" },
+    });
+    const occupants = await db.student.findMany({ where: { schoolId: school.id, deletedAt: null }, orderBy: { admissionNumber: "asc" }, take: 2 });
+    let bed = 1;
+    for (const s of occupants) {
+      await db.roomAssignment.create({ data: { roomId: rm1.id, studentId: s.id, bedNumber: `B${bed++}` } }).catch(() => undefined);
+    }
+    console.log(`  ✓ 2 rooms + ${occupants.length} occupants`);
+  }
+
+  // 18) Demo weekly timetable for Grade 10 · A (only when empty).
+  if (section10A && (await db.timetableEntry.count({ where: { sectionId: section10A.id } })) === 0) {
+    const subs = ["MATH", "SCI", "ENG", "SOC", "CMP"].map(byCode);
+    const periods = [["09:00", "09:45"], ["09:45", "10:30"], ["10:45", "11:30"], ["11:30", "12:15"]];
+    const days = ["SUNDAY", "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY"] as const;
+    let count = 0;
+    for (let di = 0; di < days.length; di++) {
+      for (let pi = 0; pi < periods.length; pi++) {
+        const subj = subs[(di + pi) % subs.length];
+        await db.timetableEntry.create({
+          data: {
+            schoolId: school.id,
+            sectionId: section10A.id,
+            subjectId: subj.id,
+            // Assign the demo teacher only to Mathematics (avoids teacher clashes).
+            teacherId: subj.code === "MATH" ? teacher.id : null,
+            day: days[di],
+            startTime: periods[pi][0],
+            endTime: periods[pi][1],
+            room: "R-204",
+          },
+        });
+        count++;
+      }
+    }
+    console.log(`  ✓ ${count} timetable periods for Grade 10 · A`);
+  }
+
+  // 19) Demo payroll — payslips for each teacher across the last two months (only when empty).
+  if ((await db.payrollRecord.count({ where: { schoolId: school.id } })) === 0) {
+    const now = new Date();
+    const months = [0, 1].map((back) => {
+      const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - back, 1));
+      return { key: `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`, back };
+    });
+    let payslips = 0;
+    for (const t of allTeachers) {
+      // Stable-ish salary derived from the employee number so the demo is varied but deterministic.
+      const seed = Number(t.employeeId.replace(/\D/g, "")) || 1;
+      const basicSalary = 35000 + (seed % 6) * 2500;
+      const allowances = 4000 + (seed % 4) * 1000;
+      const deductions = 1500;
+      const tax = Math.round(basicSalary * 0.1);
+      const netPay = Math.max(0, basicSalary + allowances - deductions - tax);
+      for (const m of months) {
+        // Previous month is paid; current month is still a draft.
+        const paid = m.back > 0;
+        await db.payrollRecord.create({
+          data: {
+            schoolId: school.id,
+            teacherId: t.id,
+            month: m.key,
+            basicSalary,
+            allowances,
+            deductions,
+            tax,
+            netPay,
+            status: paid ? "PAID" : "DRAFT",
+            paidAt: paid ? new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - m.back, 28)) : null,
+          },
+        });
+        payslips++;
+      }
+    }
+    console.log(`  ✓ ${payslips} payslips for ${allTeachers.length} teachers`);
+  }
+
+  // 20) Demo accounting ledger — income & expense entries for the current month (only when empty).
+  if ((await db.ledgerEntry.count({ where: { schoolId: school.id } })) === 0) {
+    const now = new Date();
+    const day = (n: number) => new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), n));
+    const entries: { type: "INCOME" | "EXPENSE"; category: string; amount: number; date: Date; description?: string }[] = [
+      { type: "INCOME", category: "Tuition fees", amount: 850000, date: day(3), description: "Monthly tuition collection" },
+      { type: "INCOME", category: "Admission fees", amount: 120000, date: day(5) },
+      { type: "INCOME", category: "Transport", amount: 65000, date: day(6), description: "Bus route fees" },
+      { type: "EXPENSE", category: "Salaries", amount: 540000, date: day(28), description: "Staff payroll" },
+      { type: "EXPENSE", category: "Utilities", amount: 38000, date: day(10), description: "Electricity & water" },
+      { type: "EXPENSE", category: "Supplies", amount: 22000, date: day(12), description: "Stationery & lab materials" },
+      { type: "EXPENSE", category: "Maintenance", amount: 15000, date: day(15) },
+    ];
+    for (const e of entries) {
+      await db.ledgerEntry.create({ data: { schoolId: school.id, createdById: demoUsers.ACCOUNTANT.id, ...e } });
+    }
+    console.log(`  ✓ ${entries.length} ledger entries (income & expense)`);
+  }
+
+  // 21) Demo announcements — a pinned all-staff notice + audience-targeted ones (only when empty).
+  if ((await db.announcement.count({ where: { schoolId: school.id } })) === 0) {
+    const now = new Date();
+    const daysAgo = (n: number) => new Date(now.getTime() - n * 24 * 60 * 60 * 1000);
+    const announcements: {
+      title: string;
+      body: string;
+      audience: "ALL" | "STAFF" | "STUDENTS" | "PARENTS";
+      pinned?: boolean;
+      publishedAt: Date;
+      authorId: string;
+    }[] = [
+      {
+        title: "Welcome to the 2024–2025 academic year",
+        body: "A warm welcome back to all students, parents and staff. Classes resume on schedule. Please check your timetable and fee statements in the portal.",
+        audience: "ALL",
+        pinned: true,
+        publishedAt: daysAgo(2),
+        authorId: demoUsers.SCHOOL_ADMIN.id,
+      },
+      {
+        title: "Staff meeting — Friday 4:00 PM",
+        body: "All teaching and administrative staff are requested to attend the monthly review meeting in the conference hall.",
+        audience: "STAFF",
+        publishedAt: daysAgo(1),
+        authorId: demoUsers.PRINCIPAL.id,
+      },
+      {
+        title: "Mid-term examinations begin next week",
+        body: "Students should review the exam schedule and report to their halls 15 minutes before each paper. Admit cards are available in the portal.",
+        audience: "STUDENTS",
+        publishedAt: daysAgo(1),
+        authorId: demoUsers.PRINCIPAL.id,
+      },
+      {
+        title: "Parent–teacher meeting invitation",
+        body: "Parents are invited to meet subject teachers this Saturday between 10:00 AM and 1:00 PM to discuss student progress.",
+        audience: "PARENTS",
+        publishedAt: daysAgo(3),
+        authorId: demoUsers.SCHOOL_ADMIN.id,
+      },
+    ];
+    for (const a of announcements) {
+      await db.announcement.create({ data: { schoolId: school.id, ...a } });
+    }
+    console.log(`  ✓ ${announcements.length} announcements (pinned + audience-targeted)`);
+  }
+
+  // 22) Demo messages — a small thread + a welcome, mixing read/unread (only when empty).
+  if ((await db.message.count({ where: { schoolId: school.id } })) === 0) {
+    const now = Date.now();
+    const at = (minsAgo: number) => new Date(now - minsAgo * 60 * 1000);
+    const msgs: {
+      senderId: string;
+      recipientId: string;
+      subject: string;
+      body: string;
+      createdAt: Date;
+      readAt: Date | null;
+    }[] = [
+      {
+        senderId: demoUsers.PARENT.id,
+        recipientId: demoUsers.TEACHER.id,
+        subject: "Question about this week's homework",
+        body: "Hello, could you clarify which chapters are covered in the upcoming assignment? Thank you.",
+        createdAt: at(180),
+        readAt: at(160),
+      },
+      {
+        senderId: demoUsers.TEACHER.id,
+        recipientId: demoUsers.PARENT.id,
+        subject: "Re: Question about this week's homework",
+        body: "Hi! It covers chapters 4 and 5. The assignment is due Friday. Happy to help if there are questions.",
+        createdAt: at(150),
+        readAt: null,
+      },
+      {
+        senderId: demoUsers.SCHOOL_ADMIN.id,
+        recipientId: demoUsers.STUDENT.id,
+        subject: "Welcome to the new term",
+        body: "We're glad to have you back. Please review your timetable and let us know if anything looks off.",
+        createdAt: at(60),
+        readAt: null,
+      },
+    ];
+    for (const m of msgs) {
+      await db.message.create({ data: { schoolId: school.id, ...m } });
+    }
+    console.log(`  ✓ ${msgs.length} messages (read + unread)`);
+  }
+
+  // 23) Demo teacher evaluation (only when empty).
+  if ((await db.teacherEvaluation.count({ where: { schoolId: school.id } })) === 0) {
+    const demoTeacher = await db.teacher.findFirst({ where: { userId: demoUsers.TEACHER.id } });
+    if (demoTeacher) {
+      await db.teacherEvaluation.create({
+        data: {
+          schoolId: school.id,
+          teacherId: demoTeacher.id,
+          evaluatorId: demoUsers.PRINCIPAL.id,
+          period: "2024 — Term 1",
+          teaching: 4,
+          classroom: 5,
+          collaboration: 4,
+          punctuality: 5,
+          comment: "Strong subject command and excellent rapport with students. Continue mentoring junior staff next term.",
+        },
+      });
+      console.log("  ✓ 1 teacher evaluation");
+    }
+  }
+
+  // 24) Subscriptions — Greenwood on Pro, plus a second tenant on Trial (idempotent).
+  const sunrise = await db.school.upsert({
+    where: { code: "SAC" },
+    update: {},
+    create: { name: "Sunrise Academy", code: "SAC", email: "info@sunrise.edu", city: "Pokhara", country: "Nepal" },
+  });
+  await db.subscription.upsert({
+    where: { schoolId: school.id },
+    update: {},
+    create: {
+      schoolId: school.id,
+      plan: "PRO",
+      status: "ACTIVE",
+      seats: 100,
+      priceNpr: 25000,
+      renewsAt: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000),
+      note: "Annual commitment, billed monthly.",
+    },
+  });
+  await db.subscription.upsert({
+    where: { schoolId: sunrise.id },
+    update: {},
+    create: {
+      schoolId: sunrise.id,
+      plan: "TRIAL",
+      status: "TRIALING",
+      seats: 25,
+      priceNpr: 0,
+      renewsAt: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
+    },
+  });
+  console.log("  ✓ subscriptions (Greenwood Pro · Active, Sunrise Trial)");
+
+  // 25) Demo report submissions — one pending, one already approved (only when empty).
+  if ((await db.reportSubmission.count({ where: { schoolId: school.id } })) === 0) {
+    await db.reportSubmission.create({
+      data: {
+        schoolId: school.id,
+        title: "Term 1 academic performance report",
+        category: "Academic",
+        period: "2024 — Term 1",
+        summary: "Grade 10 averages improved 6% over last term. Mathematics remains the weakest subject; recommend extra tutorials.",
+        submittedById: demoUsers.TEACHER.id,
+        status: "SUBMITTED",
+      },
+    });
+    await db.reportSubmission.create({
+      data: {
+        schoolId: school.id,
+        title: "Monthly attendance summary",
+        category: "Attendance",
+        period: "September 2024",
+        summary: "Overall attendance 92%. Three students flagged below 75% and referred to counselling.",
+        submittedById: demoUsers.TEACHER.id,
+        status: "APPROVED",
+        reviewedById: demoUsers.PRINCIPAL.id,
+        reviewedAt: new Date(),
+        reviewNote: "Approved. Good follow-up on the at-risk students.",
+      },
+    });
+    console.log("  ✓ 2 report submissions (1 pending, 1 approved)");
+  }
 
   console.log("✅ Seed complete.");
 }

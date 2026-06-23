@@ -18,6 +18,25 @@ export interface LoginState {
   email?: string;
 }
 
+// Brute-force protection: rolling window over the audit log (no extra infra).
+const RL_WINDOW_MIN = 15;
+const RL_MAX_PER_EMAIL = 5;
+const RL_MAX_PER_IP = 15;
+
+/** True if this email or IP has too many recent failed logins. */
+async function isRateLimited(email: string, ip: string | null): Promise<boolean> {
+  const since = new Date(Date.now() - RL_WINDOW_MIN * 60 * 1000);
+  const [emailFails, ipFails] = await Promise.all([
+    db.auditLog.count({
+      where: { action: "auth.login.failed", createdAt: { gte: since }, metadata: { path: ["email"], equals: email } },
+    }),
+    ip
+      ? db.auditLog.count({ where: { action: "auth.login.failed", createdAt: { gte: since }, ip } })
+      : Promise.resolve(0),
+  ]);
+  return emailFails >= RL_MAX_PER_EMAIL || ipFails >= RL_MAX_PER_IP;
+}
+
 export async function loginAction(
   _prev: LoginState,
   formData: FormData,
@@ -38,6 +57,12 @@ export async function loginAction(
   const hdrs = await headers();
   const ip = hdrs.get("x-forwarded-for")?.split(",")[0]?.trim() ?? null;
   const userAgent = hdrs.get("user-agent");
+
+  // Throttle brute-force attempts before doing any password work.
+  if (await isRateLimited(email, ip)) {
+    await audit({ action: "auth.login.blocked", metadata: { email }, ip, userAgent });
+    return { error: "Too many failed attempts. Please wait a few minutes before trying again.", email };
+  }
 
   const user = await db.user.findFirst({ where: { email, deletedAt: null } });
 

@@ -23,6 +23,8 @@ import {
   UserCog,
   ShieldCheck,
   Settings,
+  Megaphone,
+  Mail,
   type LucideIcon,
 } from "lucide-react";
 import type { SessionUser } from "@/lib/auth/types";
@@ -46,6 +48,13 @@ const NAV: NavGroup[] = [
     title: "Overview",
     items: [
       { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard, permission: "dashboard:view" },
+    ],
+  },
+  {
+    title: "Communication",
+    items: [
+      { label: "Announcements", href: "/dashboard/announcements", icon: Megaphone, permission: "announcement:view" },
+      { label: "Messages", href: "/dashboard/messages", icon: Mail, permission: "message:send" },
     ],
   },
   {
@@ -99,7 +108,7 @@ const NAV: NavGroup[] = [
       { label: "Users", href: "/dashboard/users", icon: UserCog, permission: "user:view" },
       { label: "Schools", href: "/dashboard/schools", icon: School, permission: "school:manage" },
       { label: "Audit Logs", href: "/dashboard/audit", icon: ShieldCheck, permission: "audit:view" },
-      { label: "Settings", href: "/dashboard/settings", icon: Settings, permission: "system:configure" },
+      { label: "Settings", href: "/dashboard/settings", icon: Settings, permission: "school:view" },
     ],
   },
 ];

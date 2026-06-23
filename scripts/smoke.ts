@@ -1,7 +1,7 @@
 import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
 import { signAccessToken, verifyAccessToken } from "../src/lib/auth/jwt";
-import { getRolePermissions } from "../src/lib/rbac/permissions";
+import { getRolePermissions, ALL_PERMISSIONS } from "../src/lib/rbac/permissions";
 import { DEMO_PASSWORD } from "../src/lib/auth/demo-accounts";
 
 const db = new PrismaClient();
@@ -40,7 +40,7 @@ async function main() {
   const studentPerms = getRolePermissions("STUDENT");
   log("school admin can manage students", adminPerms.includes("student:create"));
   log("student cannot manage students", !studentPerms.includes("student:create"));
-  log("super admin has all perms", getRolePermissions("SUPER_ADMIN").length === 55, String(getRolePermissions("SUPER_ADMIN").length));
+  log("super admin has all perms", getRolePermissions("SUPER_ADMIN").length === ALL_PERMISSIONS.length, String(getRolePermissions("SUPER_ADMIN").length));
 
   // 6) Counts reflect the seed.
   const [students, teachers] = await Promise.all([db.student.count(), db.teacher.count()]);

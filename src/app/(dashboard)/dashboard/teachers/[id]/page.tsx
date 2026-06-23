@@ -1,12 +1,15 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, Pencil, Mail, Phone, GraduationCap, Briefcase, CalendarDays, BookOpen, School } from "lucide-react";
+import { ArrowLeft, Pencil, Mail, Phone, GraduationCap, Briefcase, CalendarDays, BookOpen, School, Plus } from "lucide-react";
 import { requirePermission, can } from "@/lib/rbac/authorize";
 import { getTeacher } from "@/lib/teachers/queries";
+import { listEvaluations, evaluationSummary } from "@/lib/evaluations/queries";
 import { USER_STATUS_LABELS, USER_STATUS_VARIANT, experienceLabel, fullName } from "@/lib/teachers/display";
+import { overallScore, ratingVariant } from "@/lib/evaluations/display";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { Panel, EmptyState } from "@/components/dashboard/widgets";
+import { RatingStars } from "@/components/evaluations/rating-stars";
 import { TeacherStatusMenu } from "@/components/teachers/teacher-status-menu";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -32,6 +35,10 @@ export default async function TeacherDetailPage({
 
   const name = fullName(teacher.user.firstName, teacher.user.lastName);
   const canManage = can(user, "teacher:manage");
+  const canEvaluate = can(user, "teacher:evaluate");
+  const [evaluations, evalSummary] = canEvaluate
+    ? await Promise.all([listEvaluations(user, teacher.id), evaluationSummary(user, teacher.id)])
+    : [[], { count: 0, average: 0 }];
 
   const professional = [
     { icon: Briefcase, label: "Experience", value: experienceLabel(teacher.experienceYrs) },
@@ -133,6 +140,51 @@ export default async function TeacherDetailPage({
               </ul>
             )}
           </Panel>
+
+          {canEvaluate ? (
+            <Panel
+              title="Performance evaluations"
+              description={
+                evalSummary.count > 0
+                  ? `${evalSummary.count} on record · average ${evalSummary.average.toFixed(1)} / 5`
+                  : "Confidential — visible to admins & principals"
+              }
+              action={
+                <Button asChild size="sm" variant="outline">
+                  <Link href={`/dashboard/teachers/${teacher.id}/evaluations/new`}>
+                    <Plus /> New
+                  </Link>
+                </Button>
+              }
+            >
+              {evaluations.length === 0 ? (
+                <EmptyState title="No evaluations yet" description="Record a performance review for this teacher." />
+              ) : (
+                <ul className="divide-y">
+                  {evaluations.map((ev) => {
+                    const overall = overallScore(ev);
+                    return (
+                      <li key={ev.id}>
+                        <Link
+                          href={`/dashboard/teachers/${teacher.id}/evaluations/${ev.id}`}
+                          className="flex items-center justify-between gap-3 py-2.5 transition-opacity hover:opacity-80"
+                        >
+                          <div>
+                            <p className="text-sm font-medium">{ev.period}</p>
+                            <p className="text-xs text-muted-foreground">{fmtDate(ev.createdAt)}</p>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <RatingStars score={overall} />
+                            <Badge variant={ratingVariant(overall)}>{overall.toFixed(1)}</Badge>
+                          </div>
+                        </Link>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </Panel>
+          ) : null}
         </div>
       </div>
     </>

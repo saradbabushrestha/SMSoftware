@@ -1,15 +1,16 @@
 "use client";
 
 import { useState } from "react";
-import { Bell, Menu, Search } from "lucide-react";
+import { Bell, Menu } from "lucide-react";
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { SidebarContent } from "@/components/dashboard/sidebar";
+import { GlobalSearch } from "@/components/dashboard/global-search";
 import { UserMenu } from "@/components/dashboard/user-menu";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
 import type { SessionUser } from "@/lib/auth/types";
 
-export function Topbar({ user }: { user: SessionUser }) {
+export function Topbar({ user, badges }: { user: SessionUser; badges?: Record<string, number> }) {
   const [mobileOpen, setMobileOpen] = useState(false);
 
   return (
@@ -23,19 +24,12 @@ export function Topbar({ user }: { user: SessionUser }) {
         </SheetTrigger>
         <SheetContent side="left" className="w-72">
           <SheetTitle className="sr-only">Navigation</SheetTitle>
-          <SidebarContent user={user} onNavigate={() => setMobileOpen(false)} />
+          <SidebarContent user={user} badges={badges} onNavigate={() => setMobileOpen(false)} />
         </SheetContent>
       </Sheet>
 
-      {/* Search */}
-      <div className="relative hidden max-w-md flex-1 sm:block">
-        <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-        <input
-          type="search"
-          placeholder="Search students, classes, invoices…"
-          className="h-9 w-full rounded-md border border-input bg-muted/40 pl-9 pr-3 text-sm outline-none transition-colors placeholder:text-muted-foreground focus-visible:border-ring focus-visible:bg-background"
-        />
-      </div>
+      {/* Global search */}
+      <GlobalSearch />
 
       <div className="ml-auto flex items-center gap-1.5">
         <ThemeToggle />

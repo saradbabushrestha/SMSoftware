@@ -16,9 +16,11 @@ function isActive(pathname: string, href: string) {
 
 export function SidebarContent({
   user,
+  badges,
   onNavigate,
 }: {
   user: SessionUser;
+  badges?: Record<string, number>;
   onNavigate?: () => void;
 }) {
   const pathname = usePathname();
@@ -58,6 +60,11 @@ export function SidebarContent({
                         className={cn("size-4.5 shrink-0", active ? "text-sidebar-primary" : "text-muted-foreground")}
                       />
                       {item.label}
+                      {badges?.[item.href] ? (
+                        <span className="ml-auto inline-flex min-w-5 items-center justify-center rounded-full bg-destructive px-1.5 text-[11px] font-semibold leading-none text-destructive-foreground">
+                          {badges[item.href] > 99 ? "99+" : badges[item.href]}
+                        </span>
+                      ) : null}
                     </Link>
                   </li>
                 );
